@@ -5,6 +5,8 @@ from flask import Flask, jsonify, render_template
 from dotenv import load_dotenv
 sys.path.append('TinyTroupe')
 
+load_dotenv()
+
 
 os.environ["OPENAI_API_KEY"] = os.getenv('SECRET_KEY')
 # for tinytroupe to work, install:  rich, chevron, pydantic, llama-index, llama-index-readers-web
