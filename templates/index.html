@@ -183,6 +183,8 @@
             const person = createPerson();
             person.position.set(0, 0.95, 1.1);
             person.rotation.y = Math.PI;
+            // Add the userData to the person object instead of the user group
+            person.userData = { isHoverable: true };
             user.add(person);
         
             user.position.set(x, y, z);
@@ -199,16 +201,21 @@
             })
             .catch(error => console.error('Error:', error));
 
-        function createUsers() {
-            const positions = [[0, 0, 0], [3, 0, 0], [-3, 0, 0]];
-            personas.forEach((persona, index) => {
-                if (index < positions.length) {
-                    const user = createUser(...positions[index]);
-                    user.userData = persona;
-                    scene.add(user);
-                }
-            });
-        }
+            function createUsers() {
+                const positions = [[0, 0, 0], [3, 0, 0], [-3, 0, 0]];
+                personas.forEach((persona, index) => {
+                    if (index < positions.length) {
+                        const user = createUser(...positions[index]);
+                        // Find the person object within the user group and set its userData
+                        user.traverse((child) => {
+                            if (child.userData && child.userData.isHoverable) {
+                                child.userData = { ...child.userData, ...persona };
+                            }
+                        });
+                        scene.add(user);
+                    }
+                });
+            }
 
         // Raycaster for hover detection
         const raycaster = new THREE.Raycaster();
