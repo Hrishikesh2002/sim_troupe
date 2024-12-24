@@ -268,3 +268,40 @@
     </script>
 </body>
 </html>
+
+
+
+<!-- import { HoverablePerson } from './HoverablePerson.js';
+
+// After scene setup and raycaster creation:
+const hoverablePerson = new HoverablePerson(scene, raycaster);
+
+// Replace the createUser function with:
+function createUser(x, y, z) {
+    const user = new THREE.Group();
+    
+    const desk = createDesk();
+    user.add(desk);
+
+    const chair = createChair();
+    chair.position.set(0, 0, 1.2);
+    user.add(chair);
+
+    // Create person using the new module
+    const person = hoverablePerson.createPerson([x, 0.95, z + 1.1]);
+    person.rotation.y = Math.PI;
+    
+    user.position.set(x, y, z);
+    return user;
+}
+
+// In your animate function, replace the hover detection with:
+function animate() {
+    requestAnimationFrame(animate);
+    controls.update();
+
+    const hoverData = hoverablePerson.checkHover(mouse, camera);
+    hoverablePerson.updateInfoPanel(hoverData, infoPanel);
+
+    renderer.render(scene, camera);
+} -->
