@@ -3,267 +3,256 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Desk, Chair, and Sitting Person Scene</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <title>Lead Management System</title>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;700&display=swap" rel="stylesheet">
     <style>
-        body { margin: 0; }
-        canvas { display: block; }
-        #infoPanel {
-            position: absolute;
-            top: 10px;
-            left: 10px;
-            background-color: rgba(0, 0, 0, 0.7);
+        body {
+            font-family: 'Roboto', sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f4f4f4;
+        }
+        
+        .container {
+            display: grid;
+            grid-template-columns: 300px 1fr;
+            gap: 20px;
+        }
+        
+        h1, h2 {
+            color: #2196F3;
+        }
+        
+        button {
+            background-color: #2196F3;
             color: white;
-            padding: 10px;
+            border: none;
+            padding: 10px 20px;
             border-radius: 5px;
-            display: none;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.3s;
+        }
+        
+        button:hover {
+            background-color: #1976D2;
+        }
+        
+        button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+        
+        .card {
+            background-color: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        
+        .status-badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 14px;
+            font-weight: 500;
+            margin: 2px;
+        }
+        
+        .status-badge.assigned {
+            background-color: #E3F2FD;
+            color: #1976D2;
+        }
+        
+        .status-badge.meeting {
+            background-color: #FFF3E0;
+            color: #E65100;
+        }
+        
+        .status-badge.deal {
+            background-color: #E8F5E9;
+            color: #2E7D32;
+        }
+        
+        .status-badge.onboarding {
+            background-color: #F3E5F5;
+            color: #7B1FA2;
+        }
+        
+        .workflow-stage {
+            padding: 10px;
+            margin: 5px 0;
+            border-radius: 4px;
+            border-left: 4px solid #2196F3;
+        }
+        
+        .workflow-stage.current {
+            background-color: #E3F2FD;
+        }
+        
+        .conversation {
+            max-height: 400px;
+            overflow-y: auto;
+            padding-right: 10px;
+        }
+        
+        .message {
+            margin-bottom: 10px;
+            padding: 12px;
+            border-radius: 8px;
+        }
+        
+        .message.agent {
+            background-color: #E3F2FD;
+            margin-right: 20px;
+        }
+        
+        .message.lead {
+            background-color: #FFFDE7;
+            margin-left: 20px;
+        }
+        
+        .stream-select {
+            margin: 20px 0;
+            padding: 8px;
+            border-radius: 4px;
+            border: 1px solid #ccc;
         }
     </style>
 </head>
 <body>
-    <div id="infoPanel"></div>
+    <h1>Lead Management System</h1>
+    
+    <div class="card">
+        <select id="streamSelect" class="stream-select">
+            <option value="">Select Lead Source (Optional)</option>
+            <option value="LinkedIn">LinkedIn</option>
+            <option value="Twitter">Twitter</option>
+            <option value="Facebook">Facebook</option>
+            <option value="Industry Forums">Industry Forums</option>
+            <option value="Email Campaigns">Email Campaigns</option>
+        </select>
+        <button id="createLead">Create New Lead</button>
+        <button id="processLead" disabled>Process Lead</button>
+    </div>
+    
+    <div class="container">
+        <div class="sidebar">
+            <div id="leadProfile" class="card"></div>
+            <div id="leadStatus" class="card"></div>
+        </div>
+        
+        <div class="main-content">
+            <div id="workflowStages" class="card"></div>
+            <div id="conversation" class="card conversation"></div>
+        </div>
+    </div>
+
     <script>
-        // Scene setup
-        const scene = new THREE.Scene();
-        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-        const renderer = new THREE.WebGLRenderer();
-        renderer.setSize(window.innerWidth, window.innerHeight);
-        document.body.appendChild(renderer.domElement);
+        const createLeadBtn = document.getElementById('createLead');
+        const processLeadBtn = document.getElementById('processLead');
+        const streamSelect = document.getElementById('streamSelect');
+        const leadProfileDiv = document.getElementById('leadProfile');
+        const leadStatusDiv = document.getElementById('leadStatus');
+        const workflowStagesDiv = document.getElementById('workflowStages');
+        const conversationDiv = document.getElementById('conversation');
 
-        // Lighting
-        const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
-        scene.add(ambientLight);
+        let currentLead = null;
 
-        const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
-        directionalLight.position.set(5, 5, 5);
-        scene.add(directionalLight);
+        const stages = [
+            "Begun Desk",
+            "Assign Desk",
+            "Calling Desk",
+            "Meeting Desk",
+            "Onboarding Desk",
+            "Ended Desk"
+        ];
 
-        // Camera position
-        camera.position.set(0, 5, 10);
+        function updateWorkflowStages(currentStage) {
+            workflowStagesDiv.innerHTML = `
+                <h2>Workflow Progress</h2>
+                ${stages.map(stage => `
+                    <div class="workflow-stage ${stage === currentStage ? 'current' : ''}">
+                        ${stage}
+                    </div>
+                `).join('')}
+            `;
+        }
 
-        // Orbit controls
-        const controls = new THREE.OrbitControls(camera, renderer.domElement);
-        controls.enableDamping = true;
-        controls.dampingFactor = 0.05;
-
-
-        function createUser(x, y, z){
-            const user = new THREE.Group()
-
-            
-            // Create desk
-            function createDesk() {
-                const desk = new THREE.Group();
+        function updateLeadStatus(status) {
+            leadStatusDiv.innerHTML = `
+                <h2>Lead Status</h2>
+                ${status.assigned_employee ? 
+                    `<div class="status-badge assigned">Assigned to: ${status.assigned_employee}</div>` : 
+                    `<div class="status-badge assigned">Unassigned</div>`}
                 
-                // Desk top
-                const deskGeometry = new THREE.BoxGeometry(2, 0.05, 1);
-                const deskMaterial = new THREE.MeshPhongMaterial({ color: 0x8b4513 });
-                const deskTop = new THREE.Mesh(deskGeometry, deskMaterial);
-                deskTop.position.y = 0.75;
-                desk.add(deskTop);
-
-                // Desk legs
-                const legGeometry = new THREE.BoxGeometry(0.1, 0.75, 0.1);
-                const legMaterial = new THREE.MeshPhongMaterial({ color: 0x8b4513 });
-                for (let x of [-0.9, 0.9]) {
-                    for (let z of [-0.45, 0.45]) {
-                        const leg = new THREE.Mesh(legGeometry, legMaterial);
-                        leg.position.set(x, 0.375, z);
-                        desk.add(leg);
-                    }
-                }
-
-                // Monitor
-                const monitorStand = new THREE.Mesh(
-                    new THREE.BoxGeometry(0.1, 0.3, 0.1),
-                    new THREE.MeshPhongMaterial({ color: 0x333333 })
-                );
-                monitorStand.position.set(0, 0.9, -0.45);
-                desk.add(monitorStand);
-
-                const monitorScreen = new THREE.Mesh(
-                    new THREE.BoxGeometry(0.8, 0.5, 0.05),
-                    new THREE.MeshPhongMaterial({ color: 0x111111 })
-                );
-                monitorScreen.position.set(0, 1.25, -0.475);
-                desk.add(monitorScreen);
-
-                return desk;
-            }
-
-            // Create chair
-            function createChair() {
-                const chair = new THREE.Group();
-
-                // Seat
-                const seatGeometry = new THREE.BoxGeometry(0.6, 0.1, 0.6);
-                const seatMaterial = new THREE.MeshPhongMaterial({ color: 0x444444 });
-                const seat = new THREE.Mesh(seatGeometry, seatMaterial);
-                seat.position.y = 0.5;
-                chair.add(seat);
-
-                // Back
-                const backGeometry = new THREE.BoxGeometry(0.6, 0.6, 0.1);
-                const back = new THREE.Mesh(backGeometry, seatMaterial);
-                back.position.set(0, 0.8, -0.25);
-                chair.add(back);
-
-                // Legs
-                const legGeometry = new THREE.CylinderGeometry(0.05, 0.05, 0.5);
-                const legMaterial = new THREE.MeshPhongMaterial({ color: 0x888888 });
-                for (let x of [-0.25, 0.25]) {
-                    for (let z of [-0.25, 0.25]) {
-                        const leg = new THREE.Mesh(legGeometry, legMaterial);
-                        leg.position.set(x, 0.25, z);
-                        chair.add(leg);
-                    }
-                }
-
-                // Rotate the chair 180 degrees around its Y-axis
-                chair.rotation.y = Math.PI;
-
-                return chair;
-            }
-
-            // Create person
-            function createPerson() {
-                const person = new THREE.Group();
-
-                // Body
-                const bodyGeometry = new THREE.BoxGeometry(0.4, 0.54, 0.2);
-                const bodyMaterial = new THREE.MeshPhongMaterial({ color: 0x1e90ff });
-                const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
-                body.position.y = 0.25;
-                person.add(body);
-
-                // Head
-                const headGeometry = new THREE.SphereGeometry(0.15);
-                const headMaterial = new THREE.MeshPhongMaterial({ color: 0xffd700 });
-                const head = new THREE.Mesh(headGeometry, headMaterial);
-                head.position.y = 0.65;
-                person.add(head);
-
-                // Arms
-                const armGeometry = new THREE.BoxGeometry(0.1, 0.3, 0.1);
-                const armMaterial = new THREE.MeshPhongMaterial({ color: 0x1e90ff });
-                const leftArm = new THREE.Mesh(armGeometry, armMaterial);
-                leftArm.position.set(-0.25, 0.35, 0);
-                leftArm.rotation.z = -Math.PI / 6;
-                person.add(leftArm);
-
-                const rightArm = new THREE.Mesh(armGeometry, armMaterial);
-                rightArm.position.set(0.25, 0.35, 0);
-                rightArm.rotation.z = Math.PI / 6;
-                person.add(rightArm);
-
-                // Legs
-                const legGeometry = new THREE.BoxGeometry(0.15, 0.3, 0.15);
-                const legMaterial = new THREE.MeshPhongMaterial({ color: 0x000080 });
-                const leftLeg = new THREE.Mesh(legGeometry, legMaterial);
-                leftLeg.position.set(-0.1, -0.15, 0.1);
-                leftLeg.rotation.x = -Math.PI / 2;
-                person.add(leftLeg);
-
-                const rightLeg = new THREE.Mesh(legGeometry, legMaterial);
-                rightLeg.position.set(0.1, -0.15, 0.1);
-                rightLeg.rotation.x = -Math.PI / 2;
-                person.add(rightLeg);
-
-                return person;
-            }
-
-            const desk = createDesk();
-            user.add(desk);
-        
-            const chair = createChair();
-            chair.position.set(0, 0, 1.2);
-            user.add(chair);
-        
-            const person = createPerson();
-            person.position.set(0, 0.95, 1.1);
-            person.rotation.y = Math.PI;
-            // Add the userData to the person object instead of the user group
-            person.userData = { isHoverable: true };
-            user.add(person);
-        
-            user.position.set(x, y, z);
-            return user;
+                ${status.meeting_scheduled ? 
+                    `<div class="status-badge meeting">Meeting Scheduled</div>` : 
+                    `<div class="status-badge meeting">No Meeting</div>`}
+                
+                ${status.meeting_completed ? 
+                    `<div class="status-badge meeting">Meeting Completed</div>` : ''}
+                
+                ${status.deal_status ? 
+                    `<div class="status-badge deal">Deal: ${status.deal_status}</div>` : ''}
+                
+                ${status.onboarding_status ? 
+                    `<div class="status-badge onboarding">Onboarding: ${status.onboarding_status}</div>` : ''}
+            `;
         }
 
-        // Fetch persona data
-        let personas = [];
-        fetch('http://localhost:2846/generate_personas')
-            .then(response => response.json())
-            .then(data => {
-                personas = data.personas;
-                createUsers();
-            })
-            .catch(error => console.error('Error:', error));
+        createLeadBtn.addEventListener('click', async () => {
+            const stream = streamSelect.value;
+            const response = await fetch('/create_lead', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ stream: stream || undefined })
+            });
+            const data = await response.json();
+            currentLead = data;
+            
+            leadProfileDiv.innerHTML = `
+                <h2>Lead Profile</h2>
+                <p><strong>Client:</strong> ${data.client.name}</p>
+                <p><strong>Product:</strong> ${data.client.product}</p>
+                <p><strong>Target Market:</strong> ${data.client.target_market}</p>
+                <p><strong>Price Range:</strong> ${data.client.price_range}</p>
+                <p><strong>Source:</strong> ${data.stream}</p>
+            `;
+            
+            updateLeadStatus(data.status);
+            updateWorkflowStages("Begun Desk");
+            processLeadBtn.disabled = false;
+            conversationDiv.innerHTML = '<h2>Conversation</h2>';
+        });
 
-            function createUsers() {
-                const positions = [[0, 0, 0], [3, 0, 0], [-3, 0, 0]];
-                personas.forEach((persona, index) => {
-                    if (index < positions.length) {
-                        const user = createUser(...positions[index]);
-                        // Find the person object within the user group and set its userData
-                        user.traverse((child) => {
-                            if (child.userData && child.userData.isHoverable) {
-                                child.userData = { ...child.userData, ...persona };
-                            }
-                        });
-                        scene.add(user);
-                    }
-                });
+        processLeadBtn.addEventListener('click', async () => {
+            if (!currentLead) return;
+
+            const response = await fetch(`/process_lead/${currentLead.lead_id}`, { method: 'POST' });
+            const data = await response.json();
+
+            conversationDiv.innerHTML = `
+                <h2>Conversation</h2>
+                ${data.conversation.map(msg => `
+                    <div class="message ${msg.role}">
+                        <strong>${msg.role.charAt(0).toUpperCase() + msg.role.slice(1)}:</strong> ${msg.content}
+                    </div>
+                `).join('')}
+            `;
+
+            updateLeadStatus(data.status);
+            updateWorkflowStages(data.next_stage || "Ended Desk");
+            
+            if (data.next_stage === null) {
+                processLeadBtn.disabled = true;
             }
-
-        // Raycaster for hover detection
-        const raycaster = new THREE.Raycaster();
-        const mouse = new THREE.Vector2();
-
-        function onMouseMove(event) {
-            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-            mouse.y = - (event.clientY / window.innerHeight) * 2 + 1;
-        }
-
-        window.addEventListener('mousemove', onMouseMove, false);
-
-        const infoPanel = document.getElementById('infoPanel');
-
-        // Animation loop
-        function animate() {
-            requestAnimationFrame(animate);
-            controls.update();
-
-            // Check for hover
-            raycaster.setFromCamera(mouse, camera);
-            const intersects = raycaster.intersectObjects(scene.children, true);
-
-            if (intersects.length > 0) {
-                let userObject = intersects[0].object;
-                while (userObject.parent && !userObject.userData.name) {
-                    userObject = userObject.parent;
-                }
-
-                if (userObject.userData.name) {
-                    infoPanel.innerHTML = `<h3>${userObject.userData.name}</h3><p>${userObject.userData.bio}</p>`;
-                    infoPanel.style.display = 'block';
-                } else {
-                    infoPanel.style.display = 'none';
-                }
-            } else {
-                infoPanel.style.display = 'none';
-            }
-
-            renderer.render(scene, camera);
-        }
-        animate();
-
-        // Handle window resizing
-        window.addEventListener('resize', () => {
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
         });
     </script>
 </body>
