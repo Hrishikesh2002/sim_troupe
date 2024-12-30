@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Desk, Chair, and Sitting Person Scene</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <style>
+        body { margin: 0; }
+        canvas { display: block; }
+        #infoPanel {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background-color: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 10px;
+            border-radius: 5px;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div id="infoPanel"></div>
+    <script>
+        // Scene setup
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.body.appendChild(renderer.domElement);
+
+        // Lighting
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+        scene.add(ambientLight);
+
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        directionalLight.position.set(5, 5, 5);
+        scene.add(directionalLight);
+
+        // Camera position
+        camera.position.set(0, 5, 10);
+
+        // Orbit controls
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+
+
+        function createUser(x, y, z){
+            const user = new THREE.Group()
+
+            
+            // Create desk
+            function createDesk() {
+                const desk = new THREE.Group();
+                
+                // Desk top
+                const deskGeometry = new THREE.BoxGeometry(2, 0.05, 1);
+                const deskMaterial = new THREE.MeshPhongMaterial({ color: 0x8b4513 });
+                const deskTop = new THREE.Mesh(deskGeometry, deskMaterial);
+                deskTop.position.y = 0.75;
+                desk.add(deskTop);
+
+                // Desk legs
+                const legGeometry = new THREE.BoxGeometry(0.1, 0.75, 0.1);
+                const legMaterial = new THREE.MeshPhongMaterial({ color: 0x8b4513 });
+                for (let x of [-0.9, 0.9]) {
+                    for (let z of [-0.45, 0.45]) {
+                        const leg = new THREE.Mesh(legGeometry, legMaterial);
+                        leg.position.set(x, 0.375, z);
+                        desk.add(leg);
+                    }
+                }
+
+                // Monitor
+                const monitorStand = new THREE.Mesh(
+                    new THREE.BoxGeometry(0.1, 0.3, 0.1),
+                    new THREE.MeshPhongMaterial({ color: 0x333333 })
+                );
+                monitorStand.position.set(0, 0.9, -0.45);
+                desk.add(monitorStand);
+
+                const monitorScreen = new THREE.Mesh(
+                    new THREE.BoxGeometry(0.8, 0.5, 0.05),
+                    new THREE.MeshPhongMaterial({ color: 0x111111 })
+                );
+                monitorScreen.position.set(0, 1.25, -0.475);
+                desk.add(monitorScreen);
+
+                return desk;
+            }
+
+            // Create chair
+            function createChair() {
+                const chair = new THREE.Group();
+
+                // Seat
+                const seatGeometry = new THREE.BoxGeometry(0.6, 0.1, 0.6);
+                const seatMaterial = new THREE.MeshPhongMaterial({ color: 0x444444 });
+                const seat = new THREE.Mesh(seatGeometry, seatMaterial);
+                seat.position.y = 0.5;
+                chair.add(seat);
+
+                // Back
+                const backGeometry = new THREE.BoxGeometry(0.6, 0.6, 0.1);
+                const back = new THREE.Mesh(backGeometry, seatMaterial);
+                back.position.set(0, 0.8, -0.25);
+                chair.add(back);
+
+                // Legs
+                const legGeometry = new THREE.CylinderGeometry(0.05, 0.05, 0.5);
+                const legMaterial = new THREE.MeshPhongMaterial({ color: 0x888888 });
+                for (let x of [-0.25, 0.25]) {
+                    for (let z of [-0.25, 0.25]) {
+                        const leg = new THREE.Mesh(legGeometry, legMaterial);
+                        leg.position.set(x, 0.25, z);
+                        chair.add(leg);
+                    }
+                }
+
+                // Rotate the chair 180 degrees around its Y-axis
+                chair.rotation.y = Math.PI;
+
+                return chair;
+            }
+
+            // Create person
+            function createPerson() {
+                const person = new THREE.Group();
+
+                // Body
+                const bodyGeometry = new THREE.BoxGeometry(0.4, 0.54, 0.2);
+                const bodyMaterial = new THREE.MeshPhongMaterial({ color: 0x1e90ff });
+                const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
+                body.position.y = 0.25;
+                person.add(body);
+
+                // Head
+                const headGeometry = new THREE.SphereGeometry(0.15);
+                const headMaterial = new THREE.MeshPhongMaterial({ color: 0xffd700 });
+                const head = new THREE.Mesh(headGeometry, headMaterial);
+                head.position.y = 0.65;
+                person.add(head);
+
+                // Arms
+                const armGeometry = new THREE.BoxGeometry(0.1, 0.3, 0.1);
+                const armMaterial = new THREE.MeshPhongMaterial({ color: 0x1e90ff });
+                const leftArm = new THREE.Mesh(armGeometry, armMaterial);
+                leftArm.position.set(-0.25, 0.35, 0);
+                leftArm.rotation.z = -Math.PI / 6;
+                person.add(leftArm);
+
+                const rightArm = new THREE.Mesh(armGeometry, armMaterial);
+                rightArm.position.set(0.25, 0.35, 0);
+                rightArm.rotation.z = Math.PI / 6;
+                person.add(rightArm);
+
+                // Legs
+                const legGeometry = new THREE.BoxGeometry(0.15, 0.3, 0.15);
+                const legMaterial = new THREE.MeshPhongMaterial({ color: 0x000080 });
+                const leftLeg = new THREE.Mesh(legGeometry, legMaterial);
+                leftLeg.position.set(-0.1, -0.15, 0.1);
+                leftLeg.rotation.x = -Math.PI / 2;
+                person.add(leftLeg);
+
+                const rightLeg = new THREE.Mesh(legGeometry, legMaterial);
+                rightLeg.position.set(0.1, -0.15, 0.1);
+                rightLeg.rotation.x = -Math.PI / 2;
+                person.add(rightLeg);
+
+                return person;
+            }
+
+            const desk = createDesk();
+            user.add(desk);
+        
+            const chair = createChair();
+            chair.position.set(0, 0, 1.2);
+            user.add(chair);
+        
+            const person = createPerson();
+            person.position.set(0, 0.95, 1.1);
+            person.rotation.y = Math.PI;
+            // Add the userData to the person object instead of the user group
+            person.userData = { isHoverable: true };
+            user.add(person);
+        
+            user.position.set(x, y, z);
+            return user;
+        }
+
+        // Fetch persona data
+        let personas = [];
+        fetch('http://localhost:2846/generate_personas')
+            .then(response => response.json())
+            .then(data => {
+                personas = data.personas;
+                createUsers();
+            })
+            .catch(error => console.error('Error:', error));
+
+            function createUsers() {
+                const positions = [[0, 0, 0], [3, 0, 0], [-3, 0, 0]];
+                personas.forEach((persona, index) => {
+                    if (index < positions.length) {
+                        const user = createUser(...positions[index]);
+                        // Find the person object within the user group and set its userData
+                        user.traverse((child) => {
+                            if (child.userData && child.userData.isHoverable) {
+                                child.userData = { ...child.userData, ...persona };
+                            }
+                        });
+                        scene.add(user);
+                    }
+                });
+            }
+
+        // Raycaster for hover detection
+        const raycaster = new THREE.Raycaster();
+        const mouse = new THREE.Vector2();
+
+        function onMouseMove(event) {
+            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = - (event.clientY / window.innerHeight) * 2 + 1;
+        }
+
+        window.addEventListener('mousemove', onMouseMove, false);
+
+        const infoPanel = document.getElementById('infoPanel');
+
+        // Animation loop
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+
+            // Check for hover
+            raycaster.setFromCamera(mouse, camera);
+            const intersects = raycaster.intersectObjects(scene.children, true);
+
+            if (intersects.length > 0) {
+                let userObject = intersects[0].object;
+                while (userObject.parent && !userObject.userData.name) {
+                    userObject = userObject.parent;
+                }
+
+                if (userObject.userData.name) {
+                    infoPanel.innerHTML = `<h3>${userObject.userData.name}</h3><p>${userObject.userData.bio}</p>`;
+                    infoPanel.style.display = 'block';
+                } else {
+                    infoPanel.style.display = 'none';
+                }
+            } else {
+                infoPanel.style.display = 'none';
+            }
+
+            renderer.render(scene, camera);
+        }
+        animate();
+
+        // Handle window resizing
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+    </script>
+</body>
+</html>

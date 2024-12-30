@@ -1,0 +1,837 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Account Management Lifecycle - 3D Visualization</title>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;700&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tween.js/18.6.4/tween.umd.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.7.0/chart.min.js"></script>
+    <style>
+        body { margin: 0; font-family: 'Montserrat', sans-serif; }
+        #info {
+            position: absolute;
+            bottom: 50px;
+            left: 10px;
+            width: 100%;
+            text-align: left;
+            color: white;
+            font-family: 'Montserrat';
+            pointer-events: none;
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
+            z-index: 101;
+        }
+        #controls {
+            position: absolute;
+            bottom: 20px;
+            width: 100%;
+            text-align: center;
+            z-index: 100;
+        }
+        #journey {
+            position: absolute;
+            right: 0;
+            top: 0;
+            width: 300px;
+            height: 100%;
+            background: rgba(255,255,255,0.9);
+            overflow-y: auto;
+            padding: 20px;
+            box-sizing: border-box;
+            z-index: 100;
+        }
+        .button {
+            margin: 0 10px;
+            padding: 8px 16px;
+            font-size: 14px;
+            cursor: pointer;
+            background: #2196F3;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            transition: background 0.3s;
+        }
+        .button:hover { background: #1976D2; }
+        .journey-card {
+            background: white;
+            margin: 10px 0;
+            padding: 15px;
+            border-radius: 4px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            z-index: 1;
+        }
+        #threejs-canvas {
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 1;
+}
+        #analytics {
+            position: fixed;
+            top: 0px;
+            left: 0px;
+            width: 350px;
+            height: 300px;
+            background: rgba(255, 255, 255, 0.756);
+            border-radius: 8px;
+            padding: 15px;
+            z-index: 100;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        #analyticsChart {
+            width: 100%;
+            height: 100%;
+        }
+    </style>
+</head>
+<body>
+    <div id="info">
+        <h3 style="margin-bottom: 10px;">Account Management Lifecycle</h3>
+        <p style="margin: 0px; font-size: 13px;">Click and drag to rotate | Scroll to zoom | Right-click and drag to pan</p>
+    </div>
+    <div id="controls">
+        <button id="playButton" class="button">Play</button>
+        <button id="resetButton" class="button">Reset</button>
+        <button id="resetCameraButton" class="button">Reset Camera</button>
+    </div>
+    <div id="journey">
+        <h2>Journey History</h2>
+        <div id="journeyCards"></div>
+    </div>
+    <!-- New analytics container -->
+    <div id="analytics">
+        <canvas id="analyticsChart"></canvas>
+    </div>
+    <script>
+        // Get workflow data from Flask
+        const workflow = {{ workflow|tojson|safe }};
+
+        // Increased shift value to move scene further left
+        const shiftX = -25; // Increased negative value moves everything more to the left
+        const centerX = shiftX;
+        const centerZ = 0;
+
+        // Scene setup
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x212121);
+
+        // Adjusted camera position to account for new center
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(shiftX, 15, -20);
+        camera.lookAt(shiftX, 0, 0);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        renderer.domElement.id = 'threejs-canvas';  // Add this line
+
+        document.body.appendChild(renderer.domElement);
+
+        // Updated OrbitControls target
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+        controls.screenSpacePanning = false;
+        controls.minDistance = 10;
+        controls.maxDistance = 50;
+        controls.maxPolarAngle = Math.PI / 2;
+        controls.target.set(shiftX, 0, 0);
+
+        // Adjusted lighting positions
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+        scene.add(ambientLight);
+
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        directionalLight.position.set(shiftX + 10, 10, 10);
+        directionalLight.castShadow = true;
+        directionalLight.shadow.mapSize.width = 2048;
+        directionalLight.shadow.mapSize.height = 2048;
+        scene.add(directionalLight);
+
+        const pointLight1 = new THREE.PointLight(0xffffff, 0.5);
+        pointLight1.position.set(shiftX, 10, 0);
+        scene.add(pointLight1);
+
+        // Enhanced desk creation function (same as original)
+        function createEnhancedDesk(color) {
+            const desk = new THREE.Group();
+            
+            const deskGeometry = new THREE.BoxGeometry(2, 0.05, 1.4);
+            const deskMaterial = new THREE.MeshPhysicalMaterial({
+                color: color,
+                metalness: 0.5,
+                roughness: 0.2,
+                clearcoat: 1.0,
+                clearcoatRoughness: 0.1,
+                reflectivity: 1.0
+            });
+            const deskTop = new THREE.Mesh(deskGeometry, deskMaterial);
+            deskTop.castShadow = true;
+            deskTop.receiveShadow = true;
+            desk.add(deskTop);
+
+            const legGeometry = new THREE.CylinderGeometry(0.05, 0.05, 0.7);
+            const legMaterial = new THREE.MeshStandardMaterial({
+                color: 0x888888,
+                metalness: 0.8,
+                roughness: 0.2
+            });
+
+            [[-0.8, -0.35, 0.5], [0.8, -0.35, 0.5], [-0.8, -0.35, -0.5], [0.8, -0.35, -0.5]].forEach(pos => {
+                const leg = new THREE.Mesh(legGeometry, legMaterial);
+                leg.position.set(...pos);
+                leg.castShadow = true;
+                desk.add(leg);
+            });
+
+            const monitor = createMonitor();
+            desk.add(monitor);
+
+            const keyboard = createKeyboard();
+            desk.add(keyboard);
+
+            return desk;
+        }
+
+        function createMonitor() {
+            const monitor = new THREE.Group();
+            
+            const standMaterial = new THREE.MeshStandardMaterial({
+                color: 0x888888,
+                metalness: 0.8,
+                roughness: 0.2
+            });
+
+            const stand = new THREE.Mesh(
+                new THREE.CylinderGeometry(0.05, 0.05, 0.4),
+                standMaterial
+            );
+            stand.position.set(0, 0.2, -0.3);
+            monitor.add(stand);
+
+            const screen = new THREE.Mesh(
+                new THREE.BoxGeometry(1.2, 0.8, 0.05),
+                new THREE.MeshStandardMaterial({
+                    color: 0x333333,
+                    metalness: 0.8
+                })
+            );
+            screen.position.set(0, 0.6, -0.3);
+            screen.castShadow = true;
+            monitor.add(screen);
+
+            const display = new THREE.Mesh(
+                new THREE.BoxGeometry(1.1, 0.7, 0.01),
+                new THREE.MeshStandardMaterial({
+                    color: 0xffffff,
+                    emissive: 0x666666,
+                    emissiveIntensity: 0.5
+                })
+            );
+            display.position.set(0, 0.6, -0.27);
+            monitor.add(display);
+
+            return monitor;
+        }
+
+        function createKeyboard() {
+            const keyboard = new THREE.Group();
+            
+            const main = new THREE.Mesh(
+                new THREE.BoxGeometry(0.6, 0.05, 0.2),
+                new THREE.MeshStandardMaterial({
+                    color: 0x333333,
+                    metalness: 0.5,
+                    roughness: 0.7
+                })
+            );
+            main.position.set(0, 0.025, 0.2);
+            main.castShadow = true;
+            keyboard.add(main);
+
+            const mousePad = new THREE.Mesh(
+                new THREE.BoxGeometry(0.25, 0.02, 0.2),
+                new THREE.MeshStandardMaterial({
+                    color: 0x111111,
+                    roughness: 0.9
+                })
+            );
+            mousePad.position.set(0.4, 0.025, 0.2);
+            keyboard.add(mousePad);
+
+            const mouse = new THREE.Mesh(
+                new THREE.BoxGeometry(0.06, 0.03, 0.1),
+                new THREE.MeshStandardMaterial({
+                    color: 0x666666,
+                    metalness: 0.5
+                })
+            );
+            mouse.position.set(0.4, 0.04, 0.2);
+            keyboard.add(mouse);
+
+            return keyboard;
+        }
+
+        // Create stages with enhanced desks
+        const radius = 6;
+        const stagePositions = [];
+        const stageObjects = new THREE.Group();
+
+        function createDetailedCharacter() {
+    const character = new THREE.Group();
+
+    // Torso with business attire
+    const torso = new THREE.Group();
+    
+    // Shirt
+    const shirt = new THREE.Mesh(
+        new THREE.BoxGeometry(0.4, 0.5, 0.25),
+        new THREE.MeshPhongMaterial({ 
+            color: 0xffffff,
+            metalness: 0.1,
+            roughness: 0.8 
+        })
+    );
+    torso.add(shirt);
+
+    // Suit jacket
+    const jacket = new THREE.Mesh(
+        new THREE.BoxGeometry(0.45, 0.52, 0.3),
+        new THREE.MeshPhongMaterial({ 
+            color: 0x2c3e50,
+            metalness: 0.3,
+            roughness: 0.7
+        })
+    );
+    jacket.position.z = 0.02;
+    torso.add(jacket);
+
+    torso.position.y = 0.25;
+    character.add(torso);
+
+    // Head with details
+    const headGroup = new THREE.Group();
+    
+    // Base head
+    const head = new THREE.Mesh(
+        new THREE.SphereGeometry(0.15, 32, 32),
+        new THREE.MeshPhongMaterial({ color: 0xe8beac })
+    );
+    headGroup.add(head);
+
+    // Hair
+    const hair = new THREE.Mesh(
+        new THREE.SphereGeometry(0.16, 32, 32, 0, Math.PI * 2, 0, Math.PI / 2),
+        new THREE.MeshPhongMaterial({ color: 0x3d3d3d })
+    );
+    hair.position.y = 0.05;
+    headGroup.add(hair);
+
+    headGroup.position.y = 0.7;
+    character.add(headGroup);
+
+    // Arms with business suit
+    [-0.25, 0.25].forEach(x => {
+        const arm = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.04, 0.03, 0.4),
+            new THREE.MeshPhongMaterial({ color: 0x2c3e50 })
+        );
+        arm.position.set(x, 0.5, 0);
+        arm.rotation.z = x < 0 ? Math.PI / 6 : -Math.PI / 6;
+        character.add(arm);
+    });
+
+    // Legs in sitting position
+    [-0.1, 0.1].forEach(x => {
+        const leg = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.06, 0.05, 0.4),
+            new THREE.MeshPhongMaterial({ color: 0x34495e })
+        );
+        leg.position.set(x, 0.3, 0);
+        leg.rotation.x = Math.PI / 2;
+        character.add(leg);
+    });
+
+    character.castShadow = true;
+    return character;
+}
+// Add voice wave creation function
+function createVoiceWave(color) {
+    const waveGeometry = new THREE.RingGeometry(0.2, 0.3, 32);
+    const waveMaterial = new THREE.MeshBasicMaterial({ 
+        color: color,
+        transparent: true,
+        opacity: 0.5,
+        side: THREE.DoubleSide
+    });
+    const wave = new THREE.Mesh(waveGeometry, waveMaterial);
+    wave.visible = false;
+    return wave;
+}
+// Modify the workflow creation loop to add characters
+workflow.forEach((stage, i) => {
+            const angle = -i * 2 * Math.PI / workflow.length;
+            const x = radius * Math.cos(angle) + shiftX;
+            const z = radius * Math.sin(angle);
+
+            const desk = createEnhancedDesk(stage.color);
+            desk.position.set(x, 0, z);
+            desk.lookAt(centerX, 0, centerZ);
+            
+            // Add character to desk with monitor-facing orientation
+            const character = createDetailedCharacter();
+            character.position.set(0, 0, 0.8);
+            
+            // Rotate character 180 degrees to face monitor
+            character.rotation.y = Math.PI;
+            
+            // Adjust character position to sit properly at desk
+            character.position.y = 0;
+            desk.add(character);
+            
+            // Voice wave positioning remains the same
+            const voiceWave = createVoiceWave(stage.color);
+            voiceWave.position.set(0, 1.2, 0.8);
+            voiceWave.rotation.x = -Math.PI / 2;
+            voiceWave.rotation.y = 0;
+            voiceWave.material.side = THREE.DoubleSide;
+            voiceWave.visible = false;
+            desk.add(voiceWave);
+            
+            stageObjects.add(desk);
+
+    // Rest of the code remains the same...
+    const canvas = document.createElement('canvas');
+    const context = canvas.getContext('2d');
+    canvas.width = 256;
+    canvas.height = 64;
+    context.fillStyle = '#ffffff';
+    context.font = 'bold 24px Arial';
+    context.textAlign = 'center';
+    context.fillText(stage.stage, 128, 32);
+
+    const texture = new THREE.CanvasTexture(canvas);
+    const spriteMaterial = new THREE.SpriteMaterial({ map: texture });
+    const sprite = new THREE.Sprite(spriteMaterial);
+    sprite.position.set(x, 2, z);
+    sprite.scale.set(2, 0.5, 1);
+    stageObjects.add(sprite);
+
+    stagePositions.push({
+        x,
+        y: 0,
+        z,
+        character,
+        voiceWave,
+        desk
+    });
+});
+
+        scene.add(stageObjects);
+
+        // Create and position the account sphere
+        const accountGeometry = new THREE.SphereGeometry(0.3);
+        const accountMaterial = new THREE.MeshPhysicalMaterial({
+            color: 0x00BCD4,
+            emissive: 0x00BCD4,
+            emissiveIntensity: 0.2,
+            metalness: 0.5,
+            roughness: 0.2,
+            clearcoat: 0.8
+        });
+
+        const account = new THREE.Mesh(accountGeometry, accountMaterial);
+        account.position.copy(new THREE.Vector3(stagePositions[0].x, 0, stagePositions[0].z));
+        account.castShadow = true;
+        scene.add(account);
+
+        // Trail effect
+        const maxTrailPoints = 50;
+        const trailGeometry = new THREE.BufferGeometry();
+        const trailMaterial = new THREE.LineBasicMaterial({
+            color: 0x00BCD4,
+            opacity: 0.5,
+            transparent: true
+        });
+        const trailPositions = new Float32Array(maxTrailPoints * 3);
+        trailGeometry.setAttribute('position', new THREE.BufferAttribute(trailPositions, 3));
+        const trail = new THREE.Line(trailGeometry, trailMaterial);
+        scene.add(trail);
+
+        let trailPoints = [];
+
+        function updateTrail() {
+            trailPoints.push(account.position.clone());
+            if (trailPoints.length > maxTrailPoints) {
+                trailPoints.shift();
+            }
+
+            const positions = trailGeometry.attributes.position.array;
+            for (let i = 0; i < trailPoints.length; i++) {
+                const point = trailPoints[i];
+                positions[i * 3] = point.x;
+                positions[i * 3 + 1] = point.y;
+                positions[i * 3 + 2] = point.z;
+            }
+            trailGeometry.attributes.position.needsUpdate = true;
+        }
+
+        // Animation controls and state
+        let currentStage = 0;
+        let isPlaying = false;
+        let currentTween = null;
+
+        function addJourneyCard(stageName, decision, reason, sentiment) {
+            const card = document.createElement('div');
+            card.className = 'journey-card';
+            const sentimentColor = {
+                positive: 'green',
+                neutral: 'gray',
+                negative: 'red'
+            };
+
+            card.innerHTML = `
+                <h3>Stage: ${stageName}</h3>
+                <p><b>Desk ${currentStage + 1}</b></p>
+                <p><b>Decision:</b> ${decision}</p>
+                <p><b>Reason:</b> ${reason}</p>
+                <p><b>Sentiment:</b> <strong style="color: ${sentimentColor[sentiment]}">${sentiment.charAt(0).toUpperCase() + sentiment.slice(1)}</strong></p>
+                <p><b>Time:</b> ${new Date().toLocaleTimeString()}</p>
+            `;
+            document.getElementById('journeyCards').appendChild(card);
+            card.scrollIntoView({ behavior: 'smooth' });
+        }
+
+        async function getNextStage() {
+            try {
+                const response = await fetch(`/api/next_stage/${currentStage}`);
+                const data = await response.json();
+                return data;
+            } catch (error) {
+                console.error('Error getting next stage:', error);
+                return { next_stage: null, reason: "Error fetching data" };
+            }
+        }
+        let previousAnalyticsState = {
+    labels: [],
+    datasets: [
+        {
+            label: 'Previous Success Rate',
+            data: [],
+            borderColor: '#4CAF50',
+            borderDash: [5, 5],
+            tension: 0.4,
+            fill: false
+        },
+        {
+            label: 'Previous Processing Time',
+            data: [],
+            borderColor: '#2196F3',
+            borderDash: [5, 5],
+            tension: 0.4,
+            fill: false
+        },
+        {
+            label: 'Previous Error Rate',
+            data: [],
+            borderColor: '#F44336',
+            borderDash: [5, 5],
+            tension: 0.4,
+            fill: false
+        }
+    ]
+};
+// Analytics Setup
+const analyticsCtx = document.getElementById('analyticsChart').getContext('2d');
+        const stageColors = workflow.map(stage => stage.color);
+        
+        // Initialize analytics data
+        const analyticsData = {
+            labels: [],
+            datasets: [
+                {
+                    label: 'Success Rate',
+                    data: [],
+                    borderColor: '#4CAF50',
+                    tension: 0.4,
+                    fill: false
+                },
+                {
+                    label: 'Processing Time',
+                    data: [],
+                    borderColor: '#2196F3',
+                    tension: 0.4,
+                    fill: false
+                },
+                {
+                    label: 'Error Rate',
+                    data: [],
+                    borderColor: '#F44336',
+                    tension: 0.4,
+                    fill: false
+                }
+            ]
+        };
+
+        // Create Chart.js instance
+        const analyticsChart = new Chart(analyticsCtx, {
+    type: 'line',
+    data: {
+        labels: analyticsData.labels,
+        datasets: [
+            ...analyticsData.datasets,
+            ...previousAnalyticsState.datasets
+        ]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: {
+            duration: 750
+        },
+        scales: {
+            y: {
+                beginAtZero: true,
+                max: 100
+            }
+        },
+        plugins: {
+            legend: {
+                position: 'top',
+                labels: {
+                    usePointStyle: true,
+                    generateLabels: (chart) => {
+                        const labels = Chart.defaults.plugins.legend.labels.generateLabels(chart);
+                        // Group current and previous datasets
+                        const currentLabels = labels.slice(0, 3);
+                        const previousLabels = labels.slice(3);
+                        
+                        return [
+                            {
+                                text: 'Current Metrics',
+                                fillStyle: 'rgba(0,0,0,0)',
+                                strokeStyle: 'rgba(0,0,0,0)',
+                                lineWidth: 0
+                            },
+                            ...currentLabels,
+                            {
+                                text: 'Previous Run',
+                                fillStyle: 'rgba(0,0,0,0)',
+                                strokeStyle: 'rgba(0,0,0,0)',
+                                lineWidth: 0
+                            },
+                            ...previousLabels
+                        ];
+                    }
+                }
+            }
+        }
+    }
+});
+
+        // Update analytics function
+        function updateAnalytics(stageData) {
+            const timestamp = new Date().toLocaleTimeString();
+            
+            // Add new data point
+            analyticsData.labels.push(timestamp);
+            
+            // Calculate metrics based on stage data
+            const successRate = Math.min(85 + Math.random() * 15, 100); // Random success rate 85-100%
+            const processingTime = Math.min(70 + Math.random() * 30, 100); // Random processing efficiency
+            const errorRate = Math.max(5 + Math.random() * 10, 0); // Random error rate 5-15%
+            
+            analyticsData.datasets[0].data.push(successRate);
+            analyticsData.datasets[1].data.push(processingTime);
+            analyticsData.datasets[2].data.push(errorRate);
+            
+            // Keep only last 10 data points
+            if (analyticsData.labels.length > 10) {
+                analyticsData.labels.shift();
+                analyticsData.datasets.forEach(dataset => dataset.data.shift());
+            }
+            
+            // Update chart
+            analyticsChart.update();
+        }
+        // Modify moveToNextStage function to include analytics update
+        async function moveToNextStage() {
+            if (!isPlaying) return;
+
+            const nextStageData = await getNextStage();
+            if (nextStageData.next_stage === null) {
+                isPlaying = false;
+                playButton.textContent = 'Play';
+                return;
+            }
+
+            // Update analytics with new stage data
+            updateAnalytics(nextStageData);
+
+            // Rest of the existing moveToNextStage code remains the same
+            const nextStage = nextStageData.next_stage;
+            const currentPos = stagePositions[currentStage];
+            const targetPos = stagePositions[nextStage];
+
+    // Animate current character speaking
+    const currentCharacter = currentPos.character;
+    const originalHeadY = currentCharacter.children[1].position.y;
+
+    // Head bobbing animation
+    new TWEEN.Tween(currentCharacter.children[1].position)
+        .to({ y: originalHeadY + 0.1 }, 200)
+        .yoyo(true)
+        .repeat(2)
+        .start();
+
+    // Voice wave animation
+    const sourceWave = currentPos.voiceWave;
+    sourceWave.visible = true;
+    sourceWave.scale.set(1, 1, 1);
+    sourceWave.material.opacity = 0.5;
+
+    // Expand and fade voice wave
+    new TWEEN.Tween(sourceWave.scale)
+        .to({ x: 8, y: 8, z: 1 }, 1000)
+        .easing(TWEEN.Easing.Circular.Out)
+        .start();
+
+    new TWEEN.Tween(sourceWave.material)
+        .to({ opacity: 0 }, 1000)
+        .easing(TWEEN.Easing.Circular.Out)
+        .onComplete(() => {
+            sourceWave.visible = false;
+            sourceWave.scale.set(1, 1, 1);
+            sourceWave.material.opacity = 0.5;
+        })
+        .start();
+
+    // Wait for wave animation to start
+    await new Promise(resolve => setTimeout(resolve, 500));
+
+    // Move sphere with trail
+    currentTween = new TWEEN.Tween(account.position)
+        .to({ x: targetPos.x, z: targetPos.z }, 2000)
+        .easing(TWEEN.Easing.Quadratic.InOut)
+        .onUpdate(() => {
+            updateTrail();
+        })
+        .onComplete(() => {
+            // Target character reaction
+            const targetCharacter = targetPos.character;
+            new TWEEN.Tween(targetCharacter.children[1].position)
+                .to({ y: originalHeadY + 0.1 }, 200)
+                .yoyo(true)
+                .repeat(1)
+                .start();
+
+            currentStage = nextStage;
+            addJourneyCard(
+                workflow[currentStage].stage,
+                nextStageData.decision,
+                nextStageData.reason,
+                nextStageData.sentiment
+            );
+            
+            if (isPlaying) {
+                setTimeout(() => moveToNextStage(), 500);
+            }
+        })
+        .start();
+}
+        // Set up control buttons
+        const playButton = document.getElementById('playButton');
+        const resetButton = document.getElementById('resetButton');
+        const resetCameraButton = document.getElementById('resetCameraButton');
+
+        playButton.addEventListener('click', () => {
+            isPlaying = !isPlaying;
+            playButton.textContent = isPlaying ? 'Pause' : 'Play';
+            if (isPlaying) moveToNextStage();
+        });
+
+        resetButton.addEventListener('click', () => {
+    isPlaying = false;
+    playButton.textContent = 'Play';
+    currentStage = 0;
+    account.position.set(stagePositions[0].x, 0, stagePositions[0].z);
+    trailPoints = [];
+    updateTrail();
+    
+    // Store current state before reset
+    previousAnalyticsState = {
+        labels: [...analyticsData.labels],
+        datasets: analyticsData.datasets.map(dataset => ({
+            ...dataset,
+            data: [...dataset.data],
+            borderDash: [5, 5],  // Make previous data dashed
+            label: 'Previous ' + dataset.label
+        }))
+    };
+    
+    // Reset current analytics data
+    analyticsData.labels = [];
+    analyticsData.datasets.forEach(dataset => {
+        dataset.data = [];
+        dataset.borderDash = [];  // Solid line for current data
+    });
+    
+    // Update chart with both current and previous data
+    analyticsChart.data.labels = analyticsData.labels;
+    analyticsChart.data.datasets = [
+        ...analyticsData.datasets,
+        ...previousAnalyticsState.datasets
+    ];
+    analyticsChart.update();
+    
+    // Reset rest of the visualization
+    stagePositions.forEach(pos => {
+        pos.voiceWave.visible = false;
+        pos.voiceWave.scale.set(1, 1, 1);
+        pos.voiceWave.material.opacity = 0.5;
+        pos.character.children[1].position.y = 0.7;
+    });
+    
+    document.getElementById('journeyCards').innerHTML = '';
+    if (currentTween) {
+        currentTween.stop();
+        currentTween = null;
+    }
+});
+
+        resetCameraButton.addEventListener('click', () => {
+            // Updated camera reset position to account for shifted scene
+            camera.position.set(shiftX, 15, -20);
+            camera.lookAt(shiftX, 0, 0);
+            controls.target.set(shiftX, 0, 0);
+        });
+
+        // Animation loop
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            TWEEN.update();
+            renderer.render(scene, camera);
+        }
+        animate();
+
+        // Handle window resizing
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        // Initial camera setup to ensure proper viewing angle
+        camera.position.set(shiftX, 15, -20);
+        camera.lookAt(shiftX, 0, 0);
+        controls.update();
+    </script>
+</body>
+</html>

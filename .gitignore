@@ -1,4 +1,5 @@
 desk_env/
 TinyTroupe/
+node_modules/
 
 .env
